@@ -32,7 +32,12 @@ class VAE(nn.Module):
         ))
 
     def encoder(self, in_put):
-        hidden = self.encode_x2hidden(in_put['x'])
+        if self.whoami == 'CVAE':
+            in_put = torch.cat(tensors=(in_put['x'], in_put['w']), dim=1)
+        elif self.whoami == 'VAE':
+            in_put = in_put['x']
+
+        hidden = self.encode_x2hidden(in_put)
         mean = self.hidden2mean(hidden)
         log_var = self.hidden2log_var(hidden)
         return mean, log_var
@@ -49,8 +54,37 @@ class VAE(nn.Module):
     def forward(self, in_put):
         mean, log_var = self.encoder(in_put)
         z_sample = self.reparametrize(mean, log_var)
+        if 'CVAE' == self.whoami:
+            z_sample = torch.cat(tensors=(z_sample, in_put['w']), dim=1)
+        elif 'VAE' == self.whoami:
+            z_sample = z_sample
+        else:
+            raise Exception("Fix me!!!!!!")
+
         output = self.decoder(z_sample)
         return output, mean, log_var, z_sample
+
+
+class CVAE(VAE):
+    def __init__(self, x_dim, w_dim, z_dim, encoder_h_dim, decoder_h_dim):
+        super().__init__(x_dim, z_dim, encoder_h_dim, decoder_h_dim)
+        self.whoami = 'CVAE'
+        self.encode_x2hidden = nn.Sequential(*create_layers(
+            num_layers=len(encoder_h_dim),
+            dim_layers=[x_dim + w_dim] + encoder_h_dim,
+            layer='Linear',
+            activation='ReLU',
+            last_activation='ReLU'
+        ))
+
+        # Bernoulli
+        self.decode_z2x = nn.Sequential(*create_layers(
+            num_layers=len(decoder_h_dim + [x_dim]),
+            dim_layers=[z_dim + w_dim] + decoder_h_dim + [x_dim],
+            layer='Linear',
+            activation='ReLU',
+            last_activation='Sigmoid'
+        ))
 
 
 class JMVAE(VAE):
@@ -64,7 +98,6 @@ class JMVAE(VAE):
 
         super().__init__(x_dim, z_dim, encoder_hx_dim, decoder_hx_dim)
         self.whoami = 'JMVAE'
-
         self.h2last_h = nn.Linear(encoder_hx_dim[:-1][-1] + ([w_dim]+encoder_hw_dim)[:-1][-1],
                                   encoder_hx_dim[-1])
 

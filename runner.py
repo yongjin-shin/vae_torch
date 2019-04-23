@@ -28,8 +28,8 @@ class Runner:
 
     def get_data(self, data_path):
         self.data_path = data_path
-        train_path = data_path + '/train.csv'  # train_path = data_path + '/train.csv'
-        test_path = data_path + '/train.csv'
+        train_path = data_path + '/test.csv'  # train_path = data_path + '/train.csv'
+        test_path = data_path + '/test.csv'
 
         self.train_data = Dataset(train_path)
         self.test_data = Dataset(test_path)
@@ -126,7 +126,9 @@ class Runner:
         return self.anneal_param * (epoch * self.num_batch + step)
 
     def save_s(self, epoch):
-        z = torch.randn(self.batch_size, self.model.z_dim).to(self.device)
+        z = torch.randn(10, self.model.z_dim).to(self.device)
+        if 'CVAE' == self.model.whoami:
+            z = torch.cat(tensors=(z, torch.Tensor(np.identity(10))), dim=1)
         out = self.model.decoder(z)
         save_image(out['x'].view(-1, 1, 28, 28), os.path.join(self.sample_path, 'sampled-{}.png'.format(epoch+1)))
 
